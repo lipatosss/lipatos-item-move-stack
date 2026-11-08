@@ -1,0 +1,38 @@
+{
+  "id": "lipatos-item-move-stack",
+  "title": "LipatoS - Перемещение и стопки предметов",
+  "description": "Передача предметов без подтверждения ГМа; прямые операции у мастера, автоматическая передача игрокам и защита монет от попадания в инвентарь.",
+  "version": "34.2.14",
+  "compatibility": {
+    "minimum": "14",
+    "verified": "14"
+  },
+  "authors": [
+    {
+      "name": "LipatoS"
+    }
+  ],
+  "esmodules": [
+    "group-capacity.js",
+    "main.js",
+    "dynamic-weight.js"
+  ],
+  "relationships": {
+    "systems": [
+      {
+        "id": "dnd5e",
+        "type": "system",
+        "compatibility": {
+          "minimum": "6.0.0",
+          "verified": "6.0.6"
+        }
+      }
+    ]
+  },
+  "styles": [
+    "style.css"
+  ],
+  "socket": true,
+  "manifest": "https://raw.githubusercontent.com/lipatosss/lipatos-item-move-stack/main/module.json",
+  "download": "https://github.com/lipatosss/lipatos-item-move-stack/releases/latest/download/lipatos-item-move-stack.zip"
+}
