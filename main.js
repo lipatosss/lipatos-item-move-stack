@@ -362,6 +362,19 @@ let imsNativeContextClick = false;
 
 // Run the exact inventory action D&D5e previously ran on left click.
 function imsRunOldLeftClick(item, row) {
+  // LipatoS meals must ONLY apply buffs when the user explicitly chooses
+  // "ПКМ -> Использовать". The Buffs module consumes exactly one portion and
+  // applies the effect itself; never launch a second native Use activity.
+  const mealModule = game.modules.get("lipatos-buffs-debuffs");
+  const mealApi = mealModule?.active ? mealModule.api : null;
+  if (mealApi?.isMealItem?.(item) && typeof mealApi.useMealFromContext === "function") {
+    Promise.resolve(mealApi.useMealFromContext(item)).catch(error => {
+      console.error(`${MODULE_ID} | Meal context use failed`, error);
+      ui.notifications.error("Ошибка использования еды (F12).");
+    });
+    return;
+  }
+
   let action = row?.querySelector?.(".item-name.item-action[data-action]") ?? null;
   if ((!action || !action.isConnected) && item?.parent?.sheet?.element) {
     const sheet = item.parent.sheet.element;
