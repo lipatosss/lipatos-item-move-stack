@@ -1,0 +1,92 @@
+name: Publish Foundry VTT module
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "lipatos-item-move-stack.zip"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Unpack module and prepare manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/module-unpacked
+          unzip -oq lipatos-item-move-stack.zip -d /tmp/module-unpacked
+          manifest_file=$(find /tmp/module-unpacked -type f -name module.json -not -path '*/__MACOSX/*' | head -n 1)
+          if [ -z "$manifest_file" ]; then
+            echo "module.json is missing from module archive" >&2
+            exit 1
+          fi
+          module_dir=$(dirname "$manifest_file")
+          rsync -a --exclude='.git' --exclude='.github' --exclude='*.lock' "$module_dir"/ ./
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from zipfile import ZipFile, ZIP_DEFLATED
+
+          pkg = "lipatos-item-move-stack"
+          root = Path(".")
+          manifest = root / "module.json"
+          data = json.loads(manifest.read_text(encoding="utf-8"))
+          if data.get("id") != pkg:
+              raise SystemExit(f"Module ID mismatch: {data.get('id')!r} != {pkg!r}")
+          if not data.get("version"):
+              raise SystemExit("Missing version in module.json")
+          data["manifest"] = f"https://raw.githubusercontent.com/lipatosss/{pkg}/main/module.json"
+          data["download"] = f"https://github.com/lipatosss/{pkg}/releases/latest/download/{pkg}.zip"
+          manifest.write_text(json.dumps(data, ensure_ascii=False, indent=2)+"\n", encoding="utf-8")
+
+          with ZipFile(pkg+".zip", "w", ZIP_DEFLATED) as out:
+              for file in sorted(root.rglob("*")):
+                  if not file.is_file():
+                      continue
+                  parts = file.parts
+                  if (".git" in parts or ".github" in parts or "__MACOSX" in parts or
+                      file.name == pkg+".zip" or file.name.endswith(".lock")):
+                      continue
+                  out.write(file, file.as_posix())
+          print("Prepared ZIP for version", data["version"])
+          PY
+
+      - name: Commit source and packaged ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "Sync module source, manifest and installable ZIP"
+            git push origin HEAD:main
+          fi
+
+      - name: Publish GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./module.json').version")
+          tag="v${version}"
+          asset="lipatos-item-move-stack.zip"
+          if gh release view "${tag}" >/dev/null 2>&1; then
+            gh release upload "${tag}" "${asset}" --clobber
+          else
+            gh release create "${tag}" "${asset}" \
+              --title "LipatoS — Перемещение стопок предметов ${tag}" \
+              --notes "Установочный ZIP и манифест Foundry VTT." \
+              --target main --latest
+          fi
